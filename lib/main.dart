@@ -5,6 +5,7 @@ import 'login_test.dart';
 import 'register_page.dart';
 import 'package:firebase_core/firebase_core.dart'; // firebase 관련 import
 import 'firebase_options.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,7 +37,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>{
 
   // 현재 표시할 위젯을 저장하는 변수
-  Widget currentContent = MyHomePage(title: 'Counter App'); // default: button1
+  Widget currentContent = LoginPage(); // 비로그인 상태에서 LoginPage로 기본 설정
+
   // 화면 표시 업데이트 함수
   void updateContent(Widget newContent) {
     setState(() {
@@ -44,65 +46,114 @@ class _HomeScreenState extends State<HomeScreen>{
     });
   }
 
+  User? currentUser;  // 현재 접속한 유저
+
+  // 로그인 확인 함수
+  @override
+  void initState() {
+    super.initState();
+    // FirebaseAuth의 사용자 상태 변경을 수신하여 로그인 여부 확인
+    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+      setState(() {
+        currentUser = user; // 로그인된 사용자 업데이트
+        // 로그인 상태에 따라 첫 화면 설정
+        if (currentUser != null) {
+          currentContent = MyHomePage(title: 'Counter App'); // 로그인된 경우
+        } else {
+          currentContent = LoginPage(); // 비로그인 상태인 경우
+        }
+      });
+    });
+  }
+
+  // 로그아웃 함수
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    setState(() {
+      currentUser = null; // 로그아웃 후 로그인 상태를 null로 설정
+      currentContent = LoginPage(); // 로그인 페이지로 변경
+    });
+  }
+
+  // 버튼 영역 표시 함수
+  List<Widget> _getButtonWidgets() {
+    if (currentUser != null) {
+      // 로그인된 상태에서 보이는 버튼
+      return [
+        ElevatedButton(
+          onPressed: () {
+            updateContent(MyHomePage(title: 'Counter App')); // countApp으로 이동
+          },
+          child: Text('Count'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent(Sunflower()); // Sunflower으로 이동
+          },
+          child: Text('Sunflower'),
+        ),
+      ];
+    } else {
+      // 비로그인 상태에서 보이는 버튼
+      return [
+        ElevatedButton(
+          onPressed: () {
+            updateContent(LoginPage()); // LoginPage으로 이동
+          },
+          child: Text('Login'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent(RegisterPage()); // RegisterPage으로 이동
+          },
+          child: Text('Sign Up'),
+        ),
+      ];
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar( // header 영역
-        title: Text("My Practice App",style: TextStyle(color: Colors.deepPurple),),
-        backgroundColor: Colors.lightGreenAccent,
-      ),
-      body: // body 영역
-        Column( // 세로정렬
-            children: [
-              // 컨텐츠 영역
-              Expanded(
-                  child: Container(
-                    child: currentContent,  // 현재 선택된 컨텐츠 위젯 표시
-                  ),
-                  flex: 5 // column 내에서 차지하는 비율 5
+    return DefaultTabController(
+      length: currentUser != null ? 2 : 2, // 로그인 여부에 따라 Tab 수 설정
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            "My Practice App",
+            style: TextStyle(color: Colors.deepPurple, fontWeight: FontWeight.bold),
+          ),
+          backgroundColor: Colors.limeAccent,
+          actions: [
+            if (currentUser != null)
+              IconButton(
+                icon: Icon(Icons.logout),
+                onPressed: _logout,
               ),
-              // 버튼 영역
-              Expanded(
-                  child: Container(
-                    color: Colors.lime,
-                    child: Row( // 가로정렬
-                      mainAxisAlignment: MainAxisAlignment.spaceAround, // 균등 배치
-                      children: <Widget>[
-                        // button 1
-                        ElevatedButton(
-                          onPressed: () { // 누르면
-                          updateContent(MyHomePage(title: 'Counter App'));  // countApp으로 이동
-                        },
-                        child: Text('Count'), // button text
-                        ),
-                        // button2
-                        ElevatedButton(
-                          onPressed: () { // 누르면
-                          updateContent(Sunflower()); // Sunflower으로 이동
-                        },
-                        child: Text('Sunflower'),
-                        ),
-                        // button3
-                        ElevatedButton(
-                        onPressed: () { // 누르면
-                        updateContent(LoginPage()); // LoginPage으로 이동
-                        },
-                        child: Text('Login'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () { // 누르면
-                            updateContent(RegisterPage()); // LoginPage으로 이동
-                          },
-                          child: Text('sign up'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  flex: 1,  // column 내에서 차지하는 비율
-              ),
+          ],
+          bottom: TabBar(
+            tabs: currentUser != null
+                ? [
+              Tab(text: 'Count'), // 로그인 상태일 때의 탭
+              Tab(text: 'Sunflower'),
+            ]
+                : [
+              Tab(text: 'Login'), // 비로그인 상태일 때의 탭
+              Tab(text: 'Sign Up'),
             ],
+          ),
         ),
+        body: TabBarView(
+          children: currentUser != null
+              ? [
+            MyHomePage(title: 'Counter App'), // Count 탭의 컨텐츠
+            Sunflower(), // Sunflower 탭의 컨텐츠
+          ]
+              : [
+            LoginPage(), // Login 탭의 컨텐츠
+            RegisterPage(), // Sign Up 탭의 컨텐츠
+          ],
+        ),
+      ),
     );
   }
 }
-

@@ -23,8 +23,9 @@ class _SunflowerState extends State<Sunflower> {
     return Scaffold(
       // header 영역
       appBar: AppBar(
-        title: Text("Sunflower",style: TextStyle(color: Colors.purpleAccent),),
-        backgroundColor: Colors.green,
+        title: Text("Sunflower",style: TextStyle(color: Colors.black45),),
+        backgroundColor: Colors.white,
+        centerTitle: true,
       ),
       // body 영역
       body: Container(
