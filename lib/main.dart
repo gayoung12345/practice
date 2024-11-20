@@ -3,6 +3,8 @@ import 'counter_test.dart'; // 연결할 페이지 import
 import 'sunflower_test.dart';
 import 'login_test.dart';
 import 'register_page.dart';
+import 'chart_test.dart';
+import 'chart_test2.dart';
 import 'package:firebase_core/firebase_core.dart'; // firebase 관련 import
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -88,9 +90,21 @@ class _HomeScreenState extends State<HomeScreen>{
         ),
         ElevatedButton(
           onPressed: () {
-            updateContent(Sunflower()); // Sunflower으로 이동
+            updateContent( Sunflower());
           },
           child: Text('Sunflower'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent( LineChartPage());
+          },
+          child: Text('Chart'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent( CameraErrorChart());
+          },
+          child: Text('Chart'),
         ),
       ];
     } else {
@@ -115,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen>{
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: currentUser != null ? 2 : 2, // 로그인 여부에 따라 Tab 수 설정
+      length: 4, // 로그인 여부에 따라 Tab 수 설정
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -135,6 +149,8 @@ class _HomeScreenState extends State<HomeScreen>{
                 ? [
               Tab(text: 'Count'), // 로그인 상태일 때의 탭
               Tab(text: 'Sunflower'),
+              Tab(text: 'Chart'),
+              Tab(text: 'Chart2'),
             ]
                 : [
               Tab(text: 'Login'), // 비로그인 상태일 때의 탭
@@ -146,7 +162,9 @@ class _HomeScreenState extends State<HomeScreen>{
           children: currentUser != null
               ? [
             MyHomePage(title: 'Counter App'), // Count 탭의 컨텐츠
-            Sunflower(), // Sunflower 탭의 컨텐츠
+            Sunflower(),// Sunflower 탭의 컨텐츠
+            LineChartPage(),
+            CameraErrorChart(),
           ]
               : [
             LoginPage(), // Login 탭의 컨텐츠
