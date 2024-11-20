@@ -4,13 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';  // 형식 변환 라이브러리
 
 // 카메라에 오류가 나타난 횟수를 보여주는 그래프
-class CameraErrorChart extends StatefulWidget {
+class CameraErrorChart2 extends StatefulWidget {
   @override
   _CameraErrorChartState createState() => _CameraErrorChartState();
 }
 
 // 상태 클래스
-class _CameraErrorChartState extends State<CameraErrorChart> {
+class _CameraErrorChartState extends State<CameraErrorChart2> {
   Map<int, Map<String, int>> groupedData = {};  // 데이터 저장을 위한 변수: 카메라별 날짜별 에러 발생 횟수를 저장(mapping)
   bool isLoading = true; // 로딩인지 아닌지 상태를 나타냄
   DateTime currentReferenceDate = DateTime.now(); // 현재 기준 날짜
@@ -18,65 +18,66 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
   @override
   void initState() {
     super.initState();  // 생성자
-    fetchWeeklyData(currentReferenceDate);  // 초기 기준 날짜 데이터 로드
+    fetchMonthlyData(currentReferenceDate);  // 초기 기준 날짜 데이터 로드
   }
 
-  List<DateTime> getWeekRange(DateTime referenceDate) {
-    // 기준 날짜의 시간을 제거하고, 주의 월요일 계산
-    DateTime monday = DateTime(referenceDate.year, referenceDate.month, referenceDate.day)
-        .subtract(Duration(days: referenceDate.weekday - 1));
+  List<DateTime> getMonthRange(DateTime referenceDate) {
+    // 기준 날짜의 연도, 월을 이용해 시작일(1일)을 계산
+    DateTime startOfMonth = DateTime(referenceDate.year, referenceDate.month, 1);
+    // 해당 월의 마지막 날 계산
+    DateTime endOfMonth = DateTime(referenceDate.year, referenceDate.month + 1, 0);
 
-    // 월요일부터 일요일까지의 날짜 리스트 생성
-    return List.generate(7, (index) =>
-        DateTime(monday.year, monday.month, monday.day).add(Duration(days: index)));
+    // 시작일부터 마지막 날까지의 날짜 리스트 생성
+    return List.generate(
+      endOfMonth.day,
+          (index) => DateTime(startOfMonth.year, startOfMonth.month, index + 1),
+    );
   }
 
-  Future<void> fetchWeeklyData(DateTime referenceDate) async {  // Firestore에서 특정 주의 데이터를 가져옴
+  Future<void> fetchMonthlyData(DateTime referenceDate) async {
     try {
-      List<DateTime> weekRange = getWeekRange(referenceDate); // 날짜 목록
-      List<String> weekStrings = weekRange.map((date) => DateFormat('yyyy-MM-dd').format(date)).toList(); // 문자열 형식 변환
+      List<DateTime> monthRange = getMonthRange(referenceDate); // 월의 날짜 목록
+      List<String> monthStrings = monthRange.map((date) => DateFormat('yyyy-MM-dd').format(date)).toList();
 
       final snapshot = await FirebaseFirestore.instance
           .collection('errors2')
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(
-          DateTime(weekRange.first.year, weekRange.first.month, weekRange.first.day))) // 시작일 00:00:00
+          DateTime(monthRange.first.year, monthRange.first.month, monthRange.first.day))) // 월 첫날
           .where('date', isLessThan: Timestamp.fromDate(
-          DateTime(weekRange.last.year, weekRange.last.month, weekRange.last.day).add(Duration(days: 1)))) // 종료일 다음날 00:00:00
+          DateTime(monthRange.last.year, monthRange.last.month, monthRange.last.day).add(Duration(days: 1)))) // 월 마지막 날 + 1
           .get();
-
-      // print("Week Range: ${weekRange.first} - ${weekRange.last}");
 
       Map<int, Map<String, int>> tempData = {}; // 카메라별로 날짜 데이터를 초기화
       for (int cameraNum in [1, 2, 3]) {
         tempData[cameraNum] = {
-          for (String date in weekStrings) date: 0, // 날짜별 초기값 0
+          for (String date in monthStrings) date: 0, // 날짜별 초기값 0
         };
       }
 
-      for (var doc in snapshot.docs) {  // Firestore에서 가져온 데이터를 카메라별로 정리
-        final data = doc.data();  // 문서 데이터를 가져옴
-        int? cameraNum = data['cameraNum']; // 카메라 번호
-        Timestamp? timestamp = data['date'];  // 에러 발생 일 (시간X)
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        int? cameraNum = data['cameraNum'];
+        Timestamp? timestamp = data['date'];
 
         if (cameraNum != null && timestamp != null) {
-          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate());  // 날짜를 문자열로 변환
-          if (tempData[cameraNum] != null && tempData[cameraNum]!.containsKey(date)) {  // 해당 날짜에 에러 횟수를 누적
+          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate());
+          if (tempData[cameraNum] != null && tempData[cameraNum]!.containsKey(date)) {
             tempData[cameraNum]![date] = (tempData[cameraNum]![date] ?? 0) + 1;
           }
         }
       }
 
-      if (mounted) {  // 데이터 상태 업데이트
+      if (mounted) {
         setState(() {
           groupedData = tempData; // 가져온 데이터 설정
           isLoading = false;  // 로딩 상태 해제
         });
       }
-    } catch (e) { // 오류 발생 시
-      print('Error fetching weekly data: $e');  // 오류 출력
+    } catch (e) {
+      print('Error fetching monthly data: $e');
       if (mounted) {
         setState(() {
-          isLoading = false;  // 로딩 상태 해제
+          isLoading = false;
         });
       }
     }
@@ -97,32 +98,32 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    currentReferenceDate = currentReferenceDate.subtract(Duration(days: 7));  // 날짜 감소
-                    isLoading = true; // 로딩 상태 활성화
+                    currentReferenceDate = DateTime(currentReferenceDate.year, currentReferenceDate.month - 1);  // 한 달 감소
+                    isLoading = true;
                   });
-                  fetchWeeklyData(currentReferenceDate);  // 데이터 가져오기
+                  fetchMonthlyData(currentReferenceDate);  // 데이터 가져오기
                 },
                 child: Text('◀'),
               ),
-              SizedBox(width: 10),  // 버튼 사이 간격
+              SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    currentReferenceDate = DateTime.now();  // 현재 날짜 설정
-                    isLoading = true; // 로딩 상태 활성화
+                    currentReferenceDate = DateTime.now();  // 현재 날짜로 리셋
+                    isLoading = true;
                   });
-                  fetchWeeklyData(currentReferenceDate);  // 데이터 가져오기
+                  fetchMonthlyData(currentReferenceDate);  // 데이터 가져오기
                 },
                 child: Text('Reset'),
               ),
-              SizedBox(width: 10),  // 버튼 사이 간격
+              SizedBox(width: 10),
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    currentReferenceDate = currentReferenceDate.add(Duration(days: 7)); // 날짜 증가
-                    isLoading = true; // 로딩 상태 활성화
+                    currentReferenceDate = DateTime(currentReferenceDate.year, currentReferenceDate.month + 1); // 한 달 증가
+                    isLoading = true;
                   });
-                  fetchWeeklyData(currentReferenceDate);  // 데이터 가져오기
+                  fetchMonthlyData(currentReferenceDate);  // 데이터 가져오기
                 },
                 child: Text('▶'),
               ),
@@ -189,8 +190,8 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                       if (index < dateList.length) {
                         final date = dateList[index];
                         return Text(
-                          DateFormat('MM-dd').format(DateTime.parse(date)), // MM-dd 형식의 날짜 출력
-                          style: TextStyle(fontSize: 10), // 작은 폰트
+                          DateFormat('dd').format(DateTime.parse(date)), // 날짜를 'dd' 형식으로 출력
+                          style: TextStyle(fontSize: 10), // 작은 폰트로 날짜 표시
                         );
                       }
                       return Text('');
@@ -205,28 +206,18 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                   sideTitles: SideTitles(
                     showTitles: true, // 상단에 연도 표시
                     getTitlesWidget: (value, meta) {
-                      // X축의 중간 값에서 연도 표시
-                      final middleIndex = ((widget.data[1]?.keys.length ?? 0) / 2).floor(); // X축의 중간 인덱스 계산
-                      if (value == middleIndex) { // 중간 값일 때만 텍스트 출력
-                        final sunday = widget.data[1]?.keys.last; // 데이터의 마지막 날짜(일요일)
-                        if (sunday != null) {
-                          final year = DateTime.parse(sunday).year; // 일요일 연도 추출
-                          return Padding(
-                            padding: EdgeInsets.only(top: 10), // 약간의 위쪽 여백
-                            child: Text(
-                              '$year', // 일요일의 연도 표시
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.center, // 가운데 정렬
-                            ),
-                          );
-                        }
+                      final index = value.toInt();
+                      final dateList = widget.data[1]?.keys.toList() ?? [];
+                      // 그래프의 중간 인덱스에만 '2024-11' 표시
+                      if (index == (dateList.length ~/ 2)) {
+                        return Text(
+                          DateFormat('yyyy-MM').format(DateTime.parse(dateList[index])),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),  // 폰트 크기 조절
+                        );
                       }
-                      return Text(''); // 데이터가 없을 경우 빈 문자열 반환
-                    },
-                    reservedSize: 30, // 공간 확보
+                      return Text('');
+                    }
+
                   ),
                 ),
               ),

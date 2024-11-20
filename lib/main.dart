@@ -5,6 +5,8 @@ import 'login_test.dart';
 import 'register_page.dart';
 import 'chart_test.dart';
 import 'chart_test2.dart';
+import 'chart_test3.dart';
+import 'chart_test4.dart';
 import 'package:firebase_core/firebase_core.dart'; // firebase 관련 import
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -106,6 +108,18 @@ class _HomeScreenState extends State<HomeScreen>{
           },
           child: Text('Chart'),
         ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent( CameraErrorChart2());
+          },
+          child: Text('Chart'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            updateContent( CameraErrorChart3());
+          },
+          child: Text('Chart'),
+        ),
       ];
     } else {
       // 비로그인 상태에서 보이는 버튼
@@ -129,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen>{
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4, // 로그인 여부에 따라 Tab 수 설정
+      length: 10, // 로그인 여부에 따라 Tab 수 설정
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -151,6 +165,8 @@ class _HomeScreenState extends State<HomeScreen>{
               Tab(text: 'Sunflower'),
               Tab(text: 'Chart'),
               Tab(text: 'Chart2'),
+              Tab(text: 'Chart3'),
+              Tab(text: 'Chart4'),
             ]
                 : [
               Tab(text: 'Login'), // 비로그인 상태일 때의 탭
@@ -165,6 +181,8 @@ class _HomeScreenState extends State<HomeScreen>{
             Sunflower(),// Sunflower 탭의 컨텐츠
             LineChartPage(),
             CameraErrorChart(),
+            CameraErrorChart2(),
+            CameraErrorChart3(),
           ]
               : [
             LoginPage(), // Login 탭의 컨텐츠
