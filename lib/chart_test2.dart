@@ -6,10 +6,8 @@ import 'package:intl/intl.dart';  // 형식 변환 라이브러리
 // 카메라에 오류가 나타난 횟수를 보여주는 그래프
 class CameraErrorChart extends StatefulWidget {
   final int selectedCamera; // 선택한 카메라 번호 (-1은 모든 카메라)
-  final DateTime startDate;
-  final DateTime endDate;
 
-  CameraErrorChart({required this.selectedCamera,required this.startDate, required this.endDate, Key? key});
+  CameraErrorChart({required this.selectedCamera});
 
   @override
   _CameraErrorChartState createState() => _CameraErrorChartState();
@@ -20,6 +18,18 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
   Map<int, Map<String, int>> groupedData = {};  // 데이터 저장을 위한 변수: 카메라별 날짜별 에러 발생 횟수를 저장(mapping)
   bool isLoading = true; // 로딩인지 아닌지 상태를 나타냄
   DateTime currentReferenceDate = DateTime.now(); // 현재 기준 날짜
+
+  @override
+  void didUpdateWidget(CameraErrorChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedCamera != widget.selectedCamera) {
+      // 새로운 카메라 값이 전달되었을 때 처리
+      setState(() {
+        isLoading = true;
+      });
+      fetchWeeklyData(currentReferenceDate);
+    }
+  }
 
   @override
   void initState() {
@@ -85,6 +95,12 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
 
   @override
   Widget build(BuildContext context) {
+
+    // groupedData가 null이거나 비어 있을 때 로딩 인디케이터 표시
+    if (isLoading || groupedData.isEmpty) {
+      return Center(child: CircularProgressIndicator()); // 데이터가 없을 때 로딩 표시
+    }
+
     final filteredData = widget.selectedCamera == -1
         ? groupedData // 모든 카메라의 데이터를 보여줌
         : {widget.selectedCamera: groupedData[widget.selectedCamera]!}; // 선택된 카메라만 표시
@@ -189,7 +205,9 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                     showTitles: true, // 아래 축 값 표시
                     getTitlesWidget: (value, meta) {
                       final index = value.toInt();
-                      final dateList = widget.data[widget.selectedCamera]?.keys.toList() ?? [];
+                      final dateList = widget.selectedCamera == -1
+                          ? widget.data.values.expand((cameraData) => cameraData.keys).toSet().toList() // 중복 제거 및 병합
+                          : widget.data[widget.selectedCamera]?.keys.toList() ?? [];
                       if (index < dateList.length) {
                         final date = dateList[index];
                         return Text(
@@ -207,30 +225,7 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                 ),
                 topTitles: AxisTitles(
                   sideTitles: SideTitles(
-                    showTitles: true, // 상단에 연도 표시
-                    getTitlesWidget: (value, meta) {
-                      // X축의 중간 값에서 연도 표시
-                      final middleIndex = ((widget.data[widget.selectedCamera]?.keys.length ?? 0) / 2).floor(); // X축의 중간 인덱스 계산
-                      if (value == middleIndex) { // 중간 값일 때만 텍스트 출력
-                        final sunday = widget.data[widget.selectedCamera]?.keys.last; // 데이터의 마지막 날짜(일요일)
-                        if (sunday != null) {
-                          final year = DateTime.parse(sunday).year; // 일요일 연도 추출
-                          return Padding(
-                            padding: EdgeInsets.only(top: 10), // 약간의 위쪽 여백
-                            child: Text(
-                              '$year', // 일요일의 연도 표시
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              textAlign: TextAlign.center, // 가운데 정렬
-                            ),
-                          );
-                        }
-                      }
-                      return Text(''); // 데이터가 없을 경우 빈 문자열 반환
-                    },
-                    reservedSize: 30, // 공간 확보
+                    showTitles: false,
                   ),
                 ),
               ),
@@ -250,7 +245,6 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
     List<LineChartBarData> bars = [];
 
     final selectedCamera = widget.selectedCamera;
-    print('Selected Camera: ${widget.selectedCamera}');
 
     if (selectedCamera == -1) {  // "모든 카메라" 선택 시 모든 카메라 데이터 표시
       widget.data.forEach((cameraNum, dateCounts) {

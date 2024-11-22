@@ -9,6 +9,7 @@ import 'chart_test3.dart';
 import 'chart_test4.dart';
 import 'chart_test5.dart';
 import 'chartscreen.dart';
+import 'errorchartscreen.dart';
 import 'package:firebase_core/firebase_core.dart'; // firebase 관련 import
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';

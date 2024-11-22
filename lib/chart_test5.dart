@@ -9,7 +9,7 @@ class CameraErrorChart4 extends StatefulWidget {
   final DateTime startDate;
   final DateTime endDate;
 
-  CameraErrorChart4({required this.selectedCamera, required this.startDate, required this.endDate, Key? key});
+  CameraErrorChart4({required this.selectedCamera, required this.startDate, required this.endDate });
 
   @override
   _CameraErrorChartState createState() => _CameraErrorChartState();
@@ -24,59 +24,69 @@ class _CameraErrorChartState extends State<CameraErrorChart4> {
   @override
   void initState() {
     super.initState();
-    // 초기에는 기본 값으로 이번 달 데이터를 가져옴
-    final now = DateTime.now();
-    fetchMonthlyData(
-      DateTime(now.year, now.month, 1),
-      DateTime(now.year, now.month + 1, 0),
-    );
+    fetchUserData(widget.startDate, widget.endDate); // 사용자 기간 데이터 로드
+  }
+  @override
+  void didUpdateWidget(CameraErrorChart4 oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.startDate != oldWidget.startDate || widget.endDate != oldWidget.endDate) {
+      // 날짜 범위가 변경되었으면 데이터 다시 로드
+      fetchUserData(widget.startDate, widget.endDate);
+    }
   }
 
-  // Firestore에서 선택한 기간의 데이터를 가져옴
-  Future<void> fetchMonthlyData(DateTime startDate, DateTime endDate) async {
+  // Firestore에서 사용자가 선택한기간의 데이터를 가져옴
+  Future<void> fetchUserData(DateTime startDate, DateTime endDate) async {
     try {
+      // 사용자가 선택한 날짜 범위의 모든 날짜를 생성
       List<String> dateStrings = List.generate(
         endDate.difference(startDate).inDays + 1,
             (index) => DateFormat('yyyy-MM-dd').format(startDate.add(Duration(days: index))),
       );
 
+      // Firestore에서 데이터 가져오기
       final snapshot = await FirebaseFirestore.instance
-          .collection('errors2')  // 가지고 올 컬렉션 이름
+          .collection('errors2')  // Firestore 컬렉션 이름
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('date', isLessThan: Timestamp.fromDate(endDate.add(Duration(days: 1))))
           .get();
 
-      Map<int, Map<String, int>> tempData = {}; // 카메라별 날짜 데이터 초기화
+      // 초기화된 데이터 구조
+      Map<int, Map<String, int>> tempData = {};
       for (int cameraNum in [1, 2, 3]) {
         tempData[cameraNum] = {
-          for (String date in dateStrings) date: 0, // 날짜 별 초기값 0
+          for (String date in dateStrings) date: 0, // 모든 날짜에 대해 초기값 0 설정
         };
       }
 
-      for (var doc in snapshot.docs) {  // Firestore에서 가져온 데이터를 카메라별로 정리
-        final data = doc.data();  // 문서 데이터를 가져옴
+      // Firestore에서 가져온 데이터를 처리하여 tempData에 저장
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
         int? cameraNum = data['cameraNum']; // 카메라 번호
-        Timestamp? timestamp = data['date']; // 에러 발생 일 (시간X)
+        Timestamp? timestamp = data['date']; // Firestore의 날짜 필드
 
         if (cameraNum != null && timestamp != null) {
-          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate());  // 날짜를 문자열로 변환
-          if (tempData[cameraNum] != null && tempData[cameraNum]!.containsKey(date)) { // 해당 날짜에 에러 횟수를 누적
-            tempData[cameraNum]![date] = (tempData[cameraNum]![date] ?? 0) + 1;
+          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate()); // 날짜를 문자열로 변환
+          if (tempData[cameraNum]?.containsKey(date) == true) {
+            tempData[cameraNum]![date] = (tempData[cameraNum]![date] ?? 0) + 1; // 해당 날짜에 에러 횟수 누적
           }
         }
       }
 
-      if (mounted) {  // 데이터 상태 업데이트
-        setState(() {
-          groupedData = tempData; // 가져온 데이터 설정
-          isLoading = false;  // 로딩 상태 해제
-        });
-      }
-    } catch (e) { // 오류 발생 시
-      print('Error fetching data: $e'); // 오류 메세지 출력
+      // 상태 업데이트
       if (mounted) {
         setState(() {
-          isLoading = false;  // 로딩 상태 해제
+          groupedData = tempData; // 정리된 데이터를 상태에 저장
+          isLoading = false; // 로딩 상태 해제
+        });
+      }
+    } catch (e) {
+      // 오류 발생 시 처리
+      print('Error fetching data: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false; // 로딩 상태 해제
         });
       }
     }
@@ -86,6 +96,11 @@ class _CameraErrorChartState extends State<CameraErrorChart4> {
 
   @override
   Widget build(BuildContext context) {
+
+    // groupedData가 null이거나 비어 있을 때 로딩 인디케이터 표시
+    if (isLoading || groupedData.isEmpty) {
+      return Center(child: CircularProgressIndicator()); // 데이터가 없을 때 로딩 표시
+    }
 
     final filteredData = widget.selectedCamera == -1
         ? groupedData // 모든 카메라의 데이터를 보여줌
@@ -108,7 +123,7 @@ class _CameraErrorChartState extends State<CameraErrorChart4> {
                         currentReferenceDate.year, currentReferenceDate.month - 1);
                     isLoading = true;
                   });
-                  fetchMonthlyData(
+                  fetchUserData(
                     DateTime(currentReferenceDate.year, currentReferenceDate.month, 1),
                     DateTime(currentReferenceDate.year, currentReferenceDate.month + 1, 0),
                   );
@@ -122,7 +137,7 @@ class _CameraErrorChartState extends State<CameraErrorChart4> {
                     currentReferenceDate = DateTime.now();
                     isLoading = true;
                   });
-                  fetchMonthlyData(
+                  fetchUserData(
                     DateTime(currentReferenceDate.year, currentReferenceDate.month, 1),
                     DateTime(currentReferenceDate.year, currentReferenceDate.month + 1, 0),
                   );
@@ -137,7 +152,7 @@ class _CameraErrorChartState extends State<CameraErrorChart4> {
                         currentReferenceDate.year, currentReferenceDate.month + 1);
                     isLoading = true;
                   });
-                  fetchMonthlyData(
+                  fetchUserData(
                     DateTime(currentReferenceDate.year, currentReferenceDate.month, 1),
                     DateTime(currentReferenceDate.year, currentReferenceDate.month + 1, 0),
                   );
@@ -201,7 +216,11 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                     showTitles: true,
                     getTitlesWidget: (value, meta) {
                       final index = value.toInt();
-                      final dateList = widget.data[1]?.keys.toList() ?? [];
+                      final dateList = widget.selectedCamera == -1
+                          ? widget.data.values.expand((cameraData) => cameraData.keys).toSet().toList() // 중복 제거 및 병합
+                          : widget.data[widget.selectedCamera]?.keys.toList() ?? [];
+
+                      // index가 dateList 길이를 초과하지 않도록 확인
                       if (index < dateList.length) {
                         final date = dateList[index];
                         return Text(
@@ -219,18 +238,7 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                 ),
                 topTitles: AxisTitles(
                   sideTitles: SideTitles(
-                    showTitles: true,
-                    getTitlesWidget: (value, meta) {
-                      final index = value.toInt();
-                      final dateList = widget.data[1]?.keys.toList() ?? [];
-                      if (index == (dateList.length ~/ 2)) {
-                        return Text(
-                          DateFormat('yyyy-MM').format(DateTime.parse(dateList[index])),
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                        );
-                      }
-                      return Text('');
-                    },
+                    showTitles: false,
                   ),
                 ),
               ),
