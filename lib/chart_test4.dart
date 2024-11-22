@@ -74,49 +74,142 @@ class _CameraErrorChartState extends State<CameraErrorChart3> {
     }
   }
 
-  // 날짜 선택기(Dialog)를 출력
   void showDatePicker() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          contentPadding: EdgeInsets.all(10),
-          content: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.6,
-            width: MediaQuery.of(context).size.width * 0.8,
-            child: SingleChildScrollView(
-              child: SfDateRangePicker(
-                selectionMode: DateRangePickerSelectionMode.range,
-                onSelectionChanged: (args) {
-                  if (args.value is PickerDateRange) {
-                    PickerDateRange range = args.value;
-                    setState(() {
-                      startDate = range.startDate;
-                      endDate = range.endDate;
-                    });
-                  }
-                },
+        List<DateTime> selectedDates = []; // 선택된 날짜 목록
+        DateTime currentMonth = DateTime.now(); // 현재 기준 월
+        final List<DateTime> datesInMonth = _generateDatesForMonth(currentMonth);
+
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              contentPadding: EdgeInsets.all(0),
+              content: Container(
+                width: MediaQuery.of(context).size.width * 0.8,
+                height: MediaQuery.of(context).size.height * 0.3,
+                color: Colors.white,
+                padding: EdgeInsets.all(10),
+                child: Column(
+                  children: [
+                    // 월 이동 버튼
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.arrow_back),
+                            onPressed: () {
+                              setState(() {
+                                currentMonth = DateTime(
+                                    currentMonth.year, currentMonth.month - 1, 1);
+                                datesInMonth
+                                  ..clear()
+                                  ..addAll(_generateDatesForMonth(currentMonth));
+                              });
+                            },
+                          ),
+                          Text(
+                            "${DateFormat('MMMM yyyy').format(currentMonth)}",
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 18),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.arrow_forward),
+                            onPressed: () {
+                              setState(() {
+                                currentMonth = DateTime(
+                                    currentMonth.year, currentMonth.month + 1, 1);
+                                datesInMonth
+                                  ..clear()
+                                  ..addAll(_generateDatesForMonth(currentMonth));
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 날짜 그리드
+                    Expanded(
+                      child: GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7, // 7일(한 주)
+                          crossAxisSpacing: 4.0,
+                          mainAxisSpacing: 4.0,
+                        ),
+                        itemCount: datesInMonth.length,
+                        itemBuilder: (context, index) {
+                          final date = datesInMonth[index];
+                          final isSelected = selectedDates.contains(date);
+
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  selectedDates.remove(date);
+                                } else {
+                                  selectedDates.add(date);
+                                }
+                              });
+                            },
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.blue
+                                    : Colors.white,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                "${date.day}",
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                if (startDate != null && endDate != null) {
-                  setState(() {
-                    isLoading = true;
-                  });
-                  fetchMonthlyData(startDate!, endDate!);
-                }
-                Navigator.of(context).pop(); // 팝업 닫기
-              },
-              child: Text("Apply"),
-            ),
-          ],
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    if (selectedDates.isNotEmpty) {
+                      setState(() {
+                        startDate = selectedDates.first;
+                        endDate = selectedDates.last;
+                      });
+                      fetchMonthlyData(startDate!, endDate!);
+                    }
+                    Navigator.of(context).pop(); // 팝업 닫기
+                  },
+                  child: Text("Apply"),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
 
+// 해당 월의 모든 날짜 생성
+  List<DateTime> _generateDatesForMonth(DateTime month) {
+    final firstDayOfMonth = DateTime(month.year, month.month, 1);
+    final lastDayOfMonth = DateTime(month.year, month.month + 1, 0);
+
+    return List<DateTime>.generate(
+      lastDayOfMonth.day,
+          (index) => DateTime(month.year, month.month, index + 1),
+    );
   }
 
   @override

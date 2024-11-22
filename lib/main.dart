@@ -7,6 +7,8 @@ import 'chart_test.dart';
 import 'chart_test2.dart';
 import 'chart_test3.dart';
 import 'chart_test4.dart';
+import 'chart_test5.dart';
+import 'chartscreen.dart';
 import 'package:firebase_core/firebase_core.dart'; // firebase 관련 import
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -86,39 +88,15 @@ class _HomeScreenState extends State<HomeScreen>{
       return [
         ElevatedButton(
           onPressed: () {
-            updateContent(MyHomePage(title: 'Counter App')); // countApp으로 이동
+            updateContent(MainScreen()); // countApp으로 이동
           },
-          child: Text('Count'),
+          child: Text('chart'),
         ),
         ElevatedButton(
           onPressed: () {
-            updateContent( Sunflower());
+            updateContent(CameraErrorChart3()); // countApp으로 이동
           },
-          child: Text('Sunflower'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            updateContent( LineChartPage());
-          },
-          child: Text('Chart'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            updateContent( CameraErrorChart());
-          },
-          child: Text('Chart'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            updateContent( CameraErrorChart2());
-          },
-          child: Text('Chart'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            updateContent( CameraErrorChart3());
-          },
-          child: Text('Chart'),
+          child: Text('chart'),
         ),
       ];
     } else {
@@ -143,7 +121,7 @@ class _HomeScreenState extends State<HomeScreen>{
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 10, // 로그인 여부에 따라 Tab 수 설정
+      length: 2, // 로그인 여부에 따라 Tab 수 설정
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -161,12 +139,8 @@ class _HomeScreenState extends State<HomeScreen>{
           bottom: TabBar(
             tabs: currentUser != null
                 ? [
-              Tab(text: 'Count'), // 로그인 상태일 때의 탭
-              Tab(text: 'Sunflower'),
               Tab(text: 'Chart'),
               Tab(text: 'Chart2'),
-              Tab(text: 'Chart3'),
-              Tab(text: 'Chart4'),
             ]
                 : [
               Tab(text: 'Login'), // 비로그인 상태일 때의 탭
@@ -177,11 +151,7 @@ class _HomeScreenState extends State<HomeScreen>{
         body: TabBarView(
           children: currentUser != null
               ? [
-            MyHomePage(title: 'Counter App'), // Count 탭의 컨텐츠
-            Sunflower(),// Sunflower 탭의 컨텐츠
-            LineChartPage(),
-            CameraErrorChart(),
-            CameraErrorChart2(),
+            MainScreen(),
             CameraErrorChart3(),
           ]
               : [

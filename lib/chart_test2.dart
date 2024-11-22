@@ -5,6 +5,12 @@ import 'package:intl/intl.dart';  // 형식 변환 라이브러리
 
 // 카메라에 오류가 나타난 횟수를 보여주는 그래프
 class CameraErrorChart extends StatefulWidget {
+  final int selectedCamera; // 선택한 카메라 번호 (-1은 모든 카메라)
+  final DateTime startDate;
+  final DateTime endDate;
+
+  CameraErrorChart({required this.selectedCamera,required this.startDate, required this.endDate, Key? key});
+
   @override
   _CameraErrorChartState createState() => _CameraErrorChartState();
 }
@@ -31,59 +37,58 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
         DateTime(monday.year, monday.month, monday.day).add(Duration(days: index)));
   }
 
-  Future<void> fetchWeeklyData(DateTime referenceDate) async {  // Firestore에서 특정 주의 데이터를 가져옴
+  Future<void> fetchWeeklyData(DateTime referenceDate) async {
     try {
-      List<DateTime> weekRange = getWeekRange(referenceDate); // 날짜 목록
-      List<String> weekStrings = weekRange.map((date) => DateFormat('yyyy-MM-dd').format(date)).toList(); // 문자열 형식 변환
+      List<DateTime> weekRange = getWeekRange(referenceDate);
+      List<String> weekStrings = weekRange.map((date) => DateFormat('yyyy-MM-dd').format(date)).toList();
+
 
       final snapshot = await FirebaseFirestore.instance
           .collection('errors2')
-          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(
-          DateTime(weekRange.first.year, weekRange.first.month, weekRange.first.day))) // 시작일 00:00:00
-          .where('date', isLessThan: Timestamp.fromDate(
-          DateTime(weekRange.last.year, weekRange.last.month, weekRange.last.day).add(Duration(days: 1)))) // 종료일 다음날 00:00:00
+          .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(weekRange.first.year, weekRange.first.month, weekRange.first.day)))
+          .where('date', isLessThan: Timestamp.fromDate(DateTime(weekRange.last.year, weekRange.last.month, weekRange.last.day).add(Duration(days: 1))))
           .get();
 
-      // print("Week Range: ${weekRange.first} - ${weekRange.last}");
-
-      Map<int, Map<String, int>> tempData = {}; // 카메라별로 날짜 데이터를 초기화
+      Map<int, Map<String, int>> tempData = {};
       for (int cameraNum in [1, 2, 3]) {
-        tempData[cameraNum] = {
-          for (String date in weekStrings) date: 0, // 날짜별 초기값 0
-        };
+        tempData[cameraNum] = {for (String date in weekStrings) date: 0};
       }
 
-      for (var doc in snapshot.docs) {  // Firestore에서 가져온 데이터를 카메라별로 정리
-        final data = doc.data();  // 문서 데이터를 가져옴
-        int? cameraNum = data['cameraNum']; // 카메라 번호
-        Timestamp? timestamp = data['date'];  // 에러 발생 일 (시간X)
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        int? cameraNum = data['cameraNum'];
+        Timestamp? timestamp = data['date'];
 
         if (cameraNum != null && timestamp != null) {
-          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate());  // 날짜를 문자열로 변환
-          if (tempData[cameraNum] != null && tempData[cameraNum]!.containsKey(date)) {  // 해당 날짜에 에러 횟수를 누적
+          String date = DateFormat('yyyy-MM-dd').format(timestamp.toDate());
+          if (tempData[cameraNum] != null && tempData[cameraNum]!.containsKey(date)) {
             tempData[cameraNum]![date] = (tempData[cameraNum]![date] ?? 0) + 1;
           }
         }
       }
 
-      if (mounted) {  // 데이터 상태 업데이트
-        setState(() {
-          groupedData = tempData; // 가져온 데이터 설정
-          isLoading = false;  // 로딩 상태 해제
-        });
-      }
-    } catch (e) { // 오류 발생 시
-      print('Error fetching weekly data: $e');  // 오류 출력
       if (mounted) {
         setState(() {
-          isLoading = false;  // 로딩 상태 해제
+          groupedData = tempData;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching weekly data: $e');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
         });
       }
     }
   }
 
   @override
-  Widget build(BuildContext context) {  // UI 빌드 메서드
+  Widget build(BuildContext context) {
+    final filteredData = widget.selectedCamera == -1
+        ? groupedData // 모든 카메라의 데이터를 보여줌
+        : {widget.selectedCamera: groupedData[widget.selectedCamera]!}; // 선택된 카메라만 표시
+
     return Scaffold(
       body: isLoading // 로딩 중이면 로딩 인디케이터 표시
           ? Center(child: CircularProgressIndicator())
@@ -128,9 +133,9 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
               ),
             ],
           ),
-          Expanded( // 그래프 표시
+          Expanded(
             child: Center(
-              child: CameraErrorLineChart(data: groupedData), // 하단의 CameraErrorLineChart 위젯 호출
+              child: CameraErrorLineChart(data: filteredData, selectedCamera: widget.selectedCamera), // 필터링된 데이터와 선택된 카메라 번호 전달
             ),
           ),
         ],
@@ -139,26 +144,25 @@ class _CameraErrorChartState extends State<CameraErrorChart> {
   }
 }
 
-// 그래프를 그리는 위젯 클래스
 class CameraErrorLineChart extends StatefulWidget {
-  final Map<int, Map<String, int>> data;  // 카메라별 에러 데이터
+  final Map<int, Map<String, int>> data;  // 카메라 번호별 데이터
+  final int selectedCamera;  // 선택된 카메라 번호
 
-  CameraErrorLineChart({required this.data});
+  CameraErrorLineChart({required this.data, required this.selectedCamera});
 
   @override
   _CameraErrorLineChartState createState() => _CameraErrorLineChartState();
 }
 
-// 상태 클래스
 class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
-  Set<int> selectedCameras = {}; // 선택된 카메라를 저장하는 Set(리스트)
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Container(  // 그래프 컨테이너
+        // 그래프 컨테이너
+        Container(
           width: MediaQuery.of(context).size.width * 0.8, // 화면 너비의 80%
           height: MediaQuery.of(context).size.width * 0.8,
           child: LineChart(
@@ -172,9 +176,9 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                     getTitlesWidget: (value, meta) {
                       // 세로 축 값이 0부터 6까지로 고정되도록 설정
                       if (value >= 0 && value <= 6) {
-                        return Text(value.toInt().toString());  // 0~6까지 정수 값 출력
+                        return Text(value.toInt().toString()); // 0~6까지 정수 값 출력
                       }
-                      return Text(''); // 나머지 값은 빈 문자열 반환
+                      return Text('');
                     },
                     interval: 1, // Y축 간격을 1로 설정
                     reservedSize: 28, // 공간 확보
@@ -185,7 +189,7 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                     showTitles: true, // 아래 축 값 표시
                     getTitlesWidget: (value, meta) {
                       final index = value.toInt();
-                      final dateList = widget.data[1]?.keys.toList() ?? [];
+                      final dateList = widget.data[widget.selectedCamera]?.keys.toList() ?? [];
                       if (index < dateList.length) {
                         final date = dateList[index];
                         return Text(
@@ -206,9 +210,9 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
                     showTitles: true, // 상단에 연도 표시
                     getTitlesWidget: (value, meta) {
                       // X축의 중간 값에서 연도 표시
-                      final middleIndex = ((widget.data[1]?.keys.length ?? 0) / 2).floor(); // X축의 중간 인덱스 계산
+                      final middleIndex = ((widget.data[widget.selectedCamera]?.keys.length ?? 0) / 2).floor(); // X축의 중간 인덱스 계산
                       if (value == middleIndex) { // 중간 값일 때만 텍스트 출력
-                        final sunday = widget.data[1]?.keys.last; // 데이터의 마지막 날짜(일요일)
+                        final sunday = widget.data[widget.selectedCamera]?.keys.last; // 데이터의 마지막 날짜(일요일)
                         if (sunday != null) {
                           final year = DateTime.parse(sunday).year; // 일요일 연도 추출
                           return Padding(
@@ -238,42 +242,38 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
             ),
           ),
         ),
-        // 카메라 선택 버튼들(다중선택 가능 )
-        // 다중 선택 가능한 카메라 선택 FilterChip
-        Wrap(
-          spacing: 10, // 칩 간격
-          children: [
-            for (int cameraNum in widget.data.keys)
-              FilterChip(
-                label: Text(
-                  'Camera $cameraNum',
-                  style: TextStyle(
-                    color: selectedCameras.contains(cameraNum) ? Colors.white : Colors.black,
-                  ),
-                ),
-                selected: selectedCameras.contains(cameraNum),
-                backgroundColor: cameraColor(cameraNum).withOpacity(0.3),
-                selectedColor: cameraColor(cameraNum).withOpacity(0.7),
-                onSelected: (isSelected) {
-                  setState(() {
-                    if (isSelected) {
-                      selectedCameras.add(cameraNum); // 선택 추가
-                    } else {
-                      selectedCameras.remove(cameraNum); // 선택 해제
-                    }
-                  });
-                },
-              ),
-          ],
-        ),
       ],
     );
   }
 
-  List<LineChartBarData> generateLineBars() { // 카메라별 그래프 데이터 생성
+  List<LineChartBarData> generateLineBars() {
     List<LineChartBarData> bars = [];
-    widget.data.forEach((cameraNum, dateCounts) {
-      if (selectedCameras.isNotEmpty && !selectedCameras.contains(cameraNum)) return;  // 선택된 카메라만 표시
+
+    final selectedCamera = widget.selectedCamera;
+    print('Selected Camera: ${widget.selectedCamera}');
+
+    if (selectedCamera == -1) {  // "모든 카메라" 선택 시 모든 카메라 데이터 표시
+      widget.data.forEach((cameraNum, dateCounts) {
+        final spots = <FlSpot>[]; // 플롯 데이터
+        List<String> sortedDates = dateCounts.keys.toList()..sort();  // 날짜 정렬
+
+        int index = 0;
+        for (String date in sortedDates) {
+          spots.add(FlSpot(index.toDouble(), dateCounts[date]?.toDouble() ?? 0)); // 각 날짜에 대해 데이터 추가
+          index++;
+        }
+
+        bars.add( // 그래프 데이터 추가
+          LineChartBarData(
+            spots: spots, // 플롯 데이터 설정
+            color: cameraColor(cameraNum),  // 카메라별 색상
+            barWidth: 4,  // 선 굵기
+          ),
+        );
+      });
+    } else {  // 선택된 카메라에 대해서만 그래프를 표시
+      final cameraNum = selectedCamera;  // 선택된 카메라 번호
+      final dateCounts = widget.data[cameraNum]!;
 
       final spots = <FlSpot>[]; // 플롯 데이터
       List<String> sortedDates = dateCounts.keys.toList()..sort();  // 날짜 정렬
@@ -291,9 +291,11 @@ class _CameraErrorLineChartState extends State<CameraErrorLineChart> {
           barWidth: 4,  // 선 굵기
         ),
       );
-    });
-    return bars;
+    }
+
+    return bars; // 반환
   }
+
 
   Color cameraColor(int cameraNum) {
     switch (cameraNum) {
